@@ -42,11 +42,42 @@ def gerar_df_phoenix(vw_name, base_luck):
     df = df.applymap(lambda x: float(x) if isinstance(x, decimal.Decimal) else x)
     return df
 
-if not 'df_router' in st.session_state:
+def puxar_dados_phoenix():
 
     st.session_state.df_router = gerar_df_phoenix('vw_router', 'test_phoenix_salvador')
 
-    st.session_state.df_router['Reserva Mae'] = st.session_state.df_router['Reserva'].str[:10]
+    st.session_state.df_router['Reserva Mae'] = st.session_state.df_router['Reserva'].str[:10]  
+
+def calcular_media_estadia():
+
+    df_in_geral = st.session_state.df_router[(st.session_state.df_router['Tipo de Servico']=='IN') & (st.session_state.df_router['Status do Servico']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='CANCELADO') & 
+                                             (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO')].reset_index(drop=True)
+
+    df_out_geral = st.session_state.df_router[(st.session_state.df_router['Tipo de Servico']=='OUT') & (st.session_state.df_router['Status do Servico']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='CANCELADO') & 
+                                              (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO')].reset_index(drop=True)
+
+    df_in_out_geral = pd.merge(df_in_geral[['Reserva Mae', 'Servico', 'Voo', 'Data Execucao']], df_out_geral[['Reserva Mae', 'Data Execucao']], on='Reserva Mae', how='left')
+
+    df_in_out_geral = df_in_out_geral.rename(columns={'Data Execucao_x': 'Data IN', 'Data Execucao_y': 'Data OUT', 'Voo': 'Voo IN'})
+
+    df_in_out_geral = df_in_out_geral[~pd.isna(df_in_out_geral['Data OUT'])].reset_index(drop=True)
+
+    df_in_out_geral['Data IN'] = pd.to_datetime(df_in_out_geral['Data IN'])
+    df_in_out_geral['Data OUT'] = pd.to_datetime(df_in_out_geral['Data OUT'])
+
+    df_in_out_geral['Dias Estadia'] = (df_in_out_geral['Data OUT'] - df_in_out_geral['Data IN']).dt.days
+
+    df_in_out_geral['Dias Estadia'] = df_in_out_geral['Dias Estadia'].astype(int)
+
+    df_in_out_geral = df_in_out_geral[(df_in_out_geral['Dias Estadia']>0) & (df_in_out_geral['Voo IN']!='XX - 9999') & ~(pd.isna(df_in_out_geral['Voo IN']))].reset_index(drop=True)
+
+    media_estadia = round(df_in_out_geral['Dias Estadia'].mean(), 0)
+
+    return media_estadia
+
+if not 'df_router' in st.session_state:
+
+    puxar_dados_phoenix()
 
 row1 = st.columns(2)
 
@@ -58,9 +89,7 @@ with row1[0]:
 
     if atualizar_phoenix:
 
-        st.session_state.df_router = gerar_df_phoenix('vw_router', 'test_phoenix_salvador')
-
-        st.session_state.df_router['Reserva Mae'] = st.session_state.df_router['Reserva'].str[:10]
+        puxar_dados_phoenix()
 
 with row1[0]:
 
@@ -72,10 +101,11 @@ with row1[0]:
 
     data_final = container_datas.date_input('Data Inicial', value=None ,format='DD/MM/YYYY', key='data_final')
 
-df_in = st.session_state.df_router[(st.session_state.df_router['Data Execucao'] >= data_inicial) & 
-                                    (st.session_state.df_router['Data Execucao'] <= data_final) & 
-                                    (st.session_state.df_router['Tipo de Servico']=='IN') & (st.session_state.df_router['Status do Servico']!='CANCELADO')]\
-                                        .reset_index(drop=True)
+df_in = st.session_state.df_router[(st.session_state.df_router['Data Execucao'] >= data_inicial) & (st.session_state.df_router['Data Execucao'] <= data_final) & (st.session_state.df_router['Tipo de Servico']=='IN') & 
+                                   (st.session_state.df_router['Status do Servico']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='CANCELADO') & 
+                                   (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO')].reset_index(drop=True)
+
+media_estadia = calcular_media_estadia()
 
 if len(df_in)>0:
 
@@ -93,18 +123,15 @@ if len(df_in)>0:
 
 lista_reservas_in = df_in['Reserva Mae'].unique().tolist()
 
-df_out = st.session_state.df_router[(st.session_state.df_router['Tipo de Servico']=='OUT') & (st.session_state.df_router['Status do Servico']!='CANCELADO') & 
-                                    (st.session_state.df_router['Reserva Mae'].isin(lista_reservas_in))].reset_index(drop=True)
+df_out = st.session_state.df_router[(st.session_state.df_router['Tipo de Servico']=='OUT') & (st.session_state.df_router['Status do Servico']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='CANCELADO') & 
+                                    (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO') & (st.session_state.df_router['Reserva Mae'].isin(lista_reservas_in))].reset_index(drop=True)
 
 df_in_out = pd.merge(df_in[['Reserva Mae', 'Servico', 'Voo', 'Data Execucao']], df_out[['Reserva Mae', 'Data Execucao']], on='Reserva Mae', how='left')
 
 df_in_out = df_in_out.rename(columns={'Data Execucao_x': 'Data IN', 'Data Execucao_y': 'Data OUT', 'Voo': 'Voo IN'})
 
-df_in_out = df_in_out[~pd.isna(df_in_out['Data OUT'])].reset_index(drop=True)
-
-df_tour_transfer = st.session_state.df_router[((st.session_state.df_router['Tipo de Servico']=='TOUR') | 
-                                               (st.session_state.df_router['Tipo de Servico']=='TRANSFER')) & 
-                                              (st.session_state.df_router['Status do Servico']!='CANCELADO') & 
+df_tour_transfer = st.session_state.df_router[((st.session_state.df_router['Tipo de Servico']=='TOUR') | (st.session_state.df_router['Tipo de Servico']=='TRANSFER')) & (st.session_state.df_router['Status do Servico']!='CANCELADO') & 
+                                              (st.session_state.df_router['Status da Reserva']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO') & 
                                               (st.session_state.df_router['Reserva Mae'].isin(lista_reservas_in))].reset_index(drop=True)
 
 df_tour_transfer_group = df_tour_transfer.groupby(['Data Execucao', 'Reserva Mae'])['Servico'].count().reset_index()
@@ -115,16 +142,18 @@ df_tour_transfer_group = df_tour_transfer_group.rename(columns={'Servico': 'Qtd.
 
 df_in_out = pd.merge(df_in_out, df_tour_transfer_group, on='Reserva Mae', how='left')
 
+df_in_out['Qtd. Servicos'] = df_in_out['Qtd. Servicos'].fillna(0)
+
 df_in_out['Data IN'] = pd.to_datetime(df_in_out['Data IN'])
 df_in_out['Data OUT'] = pd.to_datetime(df_in_out['Data OUT'])
 
 df_in_out['Dias Estadia'] = (df_in_out['Data OUT'] - df_in_out['Data IN']).dt.days
 
+df_in_out['Dias Estadia'] = df_in_out['Dias Estadia'].fillna(media_estadia)
+
 df_in_out['Dias Estadia'] = df_in_out['Dias Estadia'].astype(int)
 
 df_in_out['Dias Estadia'] = df_in_out['Dias Estadia']-1
-
-df_in_out['Qtd. Servicos'] = df_in_out['Qtd. Servicos'].fillna(0)
 
 df_in_out['Dias Livres'] = df_in_out['Dias Estadia']-df_in_out['Qtd. Servicos']
 
@@ -191,3 +220,4 @@ if selected_rows is not None and len(selected_rows)>0:
 
                 container_dataframe.dataframe(df_ref_2[['Reserva Mae', 'Servico', 'Voo IN', 'Data IN', 'Data OUT', 'Qtd. Servicos', 'Dias Estadia', 'Dias Livres']]\
                                                 .sort_values(by='Voo IN'), hide_index=True, use_container_width=True)
+
