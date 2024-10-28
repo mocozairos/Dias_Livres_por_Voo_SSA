@@ -177,6 +177,12 @@ if selected_rows is not None and len(selected_rows)>0:
 
     df_ref = df_in_out[df_in_out['Voo IN'].isin(selected_rows['Voo IN'].unique().tolist())].reset_index(drop=True)
 
+    total_dias_livres = df_ref['Dias Livres'].sum()
+
+    with row1[1]:
+
+        st.subheader(f'Total de dias livres dos voos selecionados = {int(total_dias_livres)}')
+
     df_ref['Data IN'] = pd.to_datetime(df_ref['Data IN']).dt.date
 
     df_ref['Data OUT'] = pd.to_datetime(df_ref['Data OUT']).dt.date
