@@ -126,7 +126,7 @@ lista_reservas_in = df_in['Reserva Mae'].unique().tolist()
 df_out = st.session_state.df_router[(st.session_state.df_router['Tipo de Servico']=='OUT') & (st.session_state.df_router['Status do Servico']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='CANCELADO') & 
                                     (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO') & (st.session_state.df_router['Reserva Mae'].isin(lista_reservas_in))].reset_index(drop=True)
 
-df_in_out = pd.merge(df_in[['Reserva Mae', 'Servico', 'Voo', 'Data Execucao']], df_out[['Reserva Mae', 'Data Execucao']], on='Reserva Mae', how='left')
+df_in_out = pd.merge(df_in[['Reserva Mae', 'Servico', 'Voo', 'Horario Voo', 'Data Execucao']], df_out[['Reserva Mae', 'Data Execucao']], on='Reserva Mae', how='left')
 
 df_in_out = df_in_out.rename(columns={'Data Execucao_x': 'Data IN', 'Data Execucao_y': 'Data OUT', 'Voo': 'Voo IN'})
 
@@ -157,7 +157,7 @@ df_in_out['Dias Estadia'] = df_in_out['Dias Estadia']-1
 
 df_in_out['Dias Livres'] = df_in_out['Dias Estadia']-df_in_out['Qtd. Servicos']
 
-df_final = df_in_out.groupby('Voo IN')['Dias Livres'].sum().reset_index()
+df_final = df_in_out.groupby('Voo IN').agg({'Horario Voo': 'first', 'Dias Livres': 'sum'}).reset_index()
 
 df_final = df_final.sort_values(by=['Dias Livres'], ascending=False).reset_index(drop=True)
 
