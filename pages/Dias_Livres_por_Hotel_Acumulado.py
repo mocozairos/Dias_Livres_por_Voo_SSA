@@ -117,7 +117,7 @@ df_in_out = df_in_out.rename(columns={'Data Execucao_x': 'Data IN', 'Data Execuc
 
 df_in_out.loc[pd.isna(df_in_out['Data OUT']), 'Data OUT'] = df_in_out['Data IN'] + timedelta(days=media_estadia)
 
-df_in_out_na_base = df_in_out[df_in_out['Data OUT']>=date.today() + timedelta(days=2)].reset_index(drop=True)
+df_in_out_na_base = df_in_out[df_in_out['Data OUT']>=data_limite + timedelta(days=3)].reset_index(drop=True)
 
 df_tour_transfer = st.session_state.df_router[((st.session_state.df_router['Tipo de Servico']=='TOUR') | (st.session_state.df_router['Tipo de Servico']=='TRANSFER')) & (st.session_state.df_router['Status do Servico']!='CANCELADO') & 
                                               (st.session_state.df_router['Status da Reserva']!='CANCELADO') & (st.session_state.df_router['Status da Reserva']!='PENDENCIA DE IMPORTAÇÃO') & 
